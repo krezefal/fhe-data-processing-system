@@ -5,12 +5,8 @@ import yaml
 
 from abramov_system import keygen
 from db_api import DBConn
+from consts import *
 import utils
-
-NAME = 0
-VALUE = 2
-PASSWORD_HASH = 2
-PUBLIC_KEY = 3
 
 with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
@@ -58,9 +54,11 @@ class Interface:
             self.private_key, self.public_key \
                 = keygen.generate_abramov_keypair(base, degree)
 
-            db.create_user({"login": login,
-                            "password": md5(password.encode('utf-8')).hexdigest(),
-                            "public_key": pickle.dumps(self.public_key)})
+            # db.create_user({"login": login,
+            #                 "password": md5(password.encode('utf-8')).hexdigest(),
+            #                 "public_key": pickle.dumps(self.public_key)})
+
+            db.create_user((login, md5(password.encode('utf-8')).hexdigest(), pickle.dumps(self.public_key)))
 
             with open('keys/private_key.fhe', 'wb') as file_private_key, \
                     open('keys/public_key.fhe', 'wb') as file_public_key:
@@ -128,14 +126,17 @@ class Interface:
 
                     case 1:  # Initialize new variable
                         enc_name, name = utils.enter_name(self.public_key)
-                        enc_value, value = utils.enter_value(self.public_key)
-                        if init_new_variable(self.login, pickle.dumps(enc_name), pickle.dumps(enc_value)) is True:
-                            print(f"Initialized: {name} = {value}")
-                        else:
+                        exist = db.check_variable_exist(self.login, pickle.dumps(enc_name))
+                        if exist is True:
                             print(f"Error: value '{name}' already initialized")
+                            break
+
+                        enc_value, value = utils.enter_value(self.public_key)
+                        db.init_new_variable((pickle.dumps(enc_name), self.login, pickle.dumps(enc_value)))
+                        print(f"Initialized: {name} = {value}")
 
                     case 2:  # Get variable list
-                        dump = get_memory(self.login)
+                        dump = db.get_memory(self.login)
                         if len(dump) != 0:
                             for idx, variable in enumerate(dump):
                                 name = self.private_key.decrypt(pickle.loads(variable[NAME]))
@@ -147,7 +148,7 @@ class Interface:
 
                     case 3:  # Get variable
                         enc_name, name = utils.enter_name(self.public_key)
-                        variable = get_variable(self.login, enc_name)
+                        variable = db.get_variable(self.login, pickle.dumps(enc_name))
                         if variable is not None:
                             value = self.private_key.decrypt(pickle.loads(variable[VALUE]))
                             print(f"{name} = {value}")
@@ -156,90 +157,64 @@ class Interface:
 
                     case 4:  # Edit value
                         enc_name, name = utils.enter_name(self.public_key)
-                        enc_value, value = utils.enter_value(self.public_key)
-                        if edit_value(self.login, pickle.dumps(enc_name), pickle.dumps(enc_value)) is True:
-                            print(f"Edited: {name} = {value}")
-                        else:
+                        exist = db.check_variable_exist(self.login, pickle.dumps(enc_name))
+                        if exist is False:
                             print(f"No variable with name {name}")
+                            break
+
+                        enc_value, value = utils.enter_value(self.public_key)
+                        db.edit_value(self.login, pickle.dumps(enc_name), pickle.dumps(enc_value))
+                        print(f"Edited: {name} = {value}")
 
                     case 5:  # Delete variable
                         enc_name, name = utils.enter_name(self.public_key)
-                        if delete_variable(self.login, pickle.dumps(enc_name)) is True:
-                            print(f"Variable '{name}' was deleted")
-                        else:
+                        exist = db.check_variable_exist(self.login, pickle.dumps(enc_name))
+                        if exist is False:
                             print(f"No variable with name {name}")
+                            break
 
-                    case 6:  # a + b
-                        enc_value1, _ = utils.enter_value(self.public_key)
-                        enc_value2, _ = utils.enter_value(self.public_key)
-                        enc_result = add_variables(self.login, enc_value1, enc_value2, vars=False)
-                        result = self.private_key.decrypt(enc_result)
-                        print(f"Result = {result}")
+                        db.delete_variable(self.login, pickle.dumps(enc_name))
+                        print(f"Variable '{name}' was deleted")
 
-                    case 7:  # a + b with vars
+                    case 6 | 7 | 8 | 9:  # a + b
                         enc_name1, name1 = utils.enter_name(self.public_key)
                         enc_name2, name2 = utils.enter_name(self.public_key)
-                        enc_result = add_variables(self.login, pickle.dumps(enc_name1),
-                                                   pickle.dumps(enc_name2), vars=True)
-                        if enc_result is not None:
+
+                        exist = db.check_variable_exist(self.login, pickle.dumps(enc_name1))
+                        if exist is False:
+                            print(f"No variable with name {enc_name1}")
+                            break
+                        exist = db.check_variable_exist(self.login, pickle.dumps(enc_name2))
+                        if exist is False:
+                            print(f"No variable with name {enc_name2}")
+                            break
+
+                        result = None
+                        if choice == 6:
+                            enc_result, _, _ = db.calc_variables(self.login, pickle.dumps(enc_name1),
+                                                                 pickle.dumps(enc_name2), op='+')
                             result = self.private_key.decrypt(enc_result)
-                            print(f"{name1} + {name2} = {result}")
-                        else:
-                            print(f"At least one variable is undefined")
 
-                    case 8:  # a - b
-                        enc_value1, _ = utils.enter_value(self.public_key)
-                        enc_value2, _ = utils.enter_value(self.public_key)
-                        enc_result = sub_variables(self.login, enc_value1, enc_value2, vars=False)
-                        result = self.private_key.decrypt(enc_result)
-                        print(f"Result = {result}")
-
-                    case 9:  # a - b with vars
-                        enc_name1, name1 = utils.enter_name(self.public_key)
-                        enc_name2, name2 = utils.enter_name(self.public_key)
-                        enc_result = sub_variables(self.login, pickle.dumps(enc_name1),
-                                                   pickle.dumps(enc_name2), vars=True)
-                        if enc_result is not None:
+                        if choice == 7:
+                            enc_result, _, _ = db.calc_variables(self.login, pickle.dumps(enc_name1),
+                                                                 pickle.dumps(enc_name2), op='-')
                             result = self.private_key.decrypt(enc_result)
-                            print(f"{name1} - {name2} = {result}")
-                        else:
-                            print(f"At least one variable is undefined")
 
-                    case 10:  # a * b
-                        enc_value1, _ = utils.enter_value(self.public_key)
-                        enc_value2, _ = utils.enter_value(self.public_key)
-                        enc_result = mult_variables(self.login, enc_value1, enc_value2, vars=False)
-                        result = self.private_key.decrypt(enc_result)
-                        print(f"Result = {result}")
-
-                    case 11:  # a * b with vars
-                        enc_name1, name1 = utils.enter_name(self.public_key)
-                        enc_name2, name2 = utils.enter_name(self.public_key)
-                        enc_result = mult_variables(self.login, pickle.dumps(enc_name1),
-                                                    pickle.dumps(enc_name2), vars=True)
-                        if enc_result is not None:
+                        if choice == 8:
+                            enc_result, _, _ = db.calc_variables(self.login, pickle.dumps(enc_name1),
+                                                                 pickle.dumps(enc_name2), op='*')
                             result = self.private_key.decrypt(enc_result)
-                            print(f"{name1} * {name2} = {result}")
-                        else:
-                            print(f"At least one variable is undefined")
 
-                    case 12:  # a / b
-                        enc_value1, _ = utils.enter_value(self.public_key)
-                        enc_value2, _ = utils.enter_value(self.public_key)
-                        enc_result = div_variables(self.login, enc_value1, enc_value2, vars=False)
-                        result = self.private_key.decrypt(enc_result)
-                        print(f"Result = {result}")
+                        if choice == 9:
+                            enc_q, enc_r, enc_value2 = db.calc_variables(self.login, pickle.dumps(enc_name1),
+                                                                         pickle.dumps(enc_name2), op='/')
+                            dec_q = self.private_key.decrypt(enc_q)
+                            dec_r = self.private_key.decrypt(enc_r)
+                            dec_value2 = self.private_key.decrypt(enc_value2)
 
-                    case 13:  # a / b with vars
-                        enc_name1, name1 = utils.enter_name(self.public_key)
-                        enc_name2, name2 = utils.enter_name(self.public_key)
-                        enc_result = div_variables(self.login, pickle.dumps(enc_name1),
-                                                   pickle.dumps(enc_name2), vars=True)
-                        if enc_result is not None:
-                            result = self.private_key.decrypt(enc_result)
-                            print(f"{name1} / {name2} = {result}")
-                        else:
-                            print(f"At least one variable is undefined")
+                            result = dec_q + dec_r / dec_value2
+
+                        print(f"{name1} + {name2} = {result}")
 
                     case _:
                         print("Undefined option")
