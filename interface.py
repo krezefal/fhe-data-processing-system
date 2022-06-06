@@ -111,12 +111,14 @@ class Interface:
         while True:
 
             print()
-            print("'0' -> Logout                     '7' -> a + b")
-            print("'1' -> Initialize new variable    '8' -> a - b")
-            print("'2' -> Get variable list          '9' -> a * b")
-            print("'3' -> Get variable               '10' -> a / b")
-            print("'4' -> Edit value")
-            print("'5' -> Delete variable")
+            print("'0' -> Logout                     '6' -> a + b")
+            print("'1' -> Initialize new variable    '7' -> a - b")
+            print("'2' -> Get variable list          '8' -> a * b")
+            print("'3' -> Get variable               '9' -> a / b")
+            print("'4' -> Edit value                 '10' -> Get private key (root)")
+            print("'5' -> Delete variable            '11' -> Get public key (polynomial)")
+            print()
+            print("             '12' -> Update private and public keys")
             print()
 
             while True:
@@ -186,45 +188,79 @@ class Interface:
                     db.delete_variable(self.login, name)
                     print(f"{Fore.GREEN}Variable '{name}' was deleted{Style.RESET_ALL}")
 
-                case 6 | 7 | 8 | 9:  # a + b
-                    enc_name1, name1 = utils.enter_name(self.public_key)
-                    enc_name2, name2 = utils.enter_name(self.public_key)
+                case 6 | 7 | 8 | 9:  # a +/-/*/'/' b
+                    name1 = utils.enter_name(self.public_key)
+                    name2 = utils.enter_name(self.public_key)
 
                     exist = db.check_variable_exist(self.login, name1)
                     if exist is False:
-                        print(f"{Fore.RED}No variable with name {enc_name1}{Style.RESET_ALL}")
+                        print(f"{Fore.RED}No variable with name {name1}{Style.RESET_ALL}")
                         continue
                     exist = db.check_variable_exist(self.login, name2)
                     if exist is False:
-                        print(f"{Fore.RED}No variable with name {enc_name2}{Style.RESET_ALL}")
+                        print(f"{Fore.RED}No variable with name {name2}{Style.RESET_ALL}")
                         continue
 
-                    result = None
                     if choice == 6:
-                        enc_result, _, _ = db.calc_variables(self.login, pickle.dumps(enc_name1),
-                                                             pickle.dumps(enc_name2), op='+')
+                        enc_result, _, _ = db.calc_variables(self.login, name1, name2, op='+')
                         result = self.private_key.decrypt(enc_result)
+                        print(f"{Fore.GREEN}{name1} + {name2} = {result}{Style.RESET_ALL}")
 
                     if choice == 7:
-                        enc_result, _, _ = db.calc_variables(self.login, pickle.dumps(enc_name1),
-                                                             pickle.dumps(enc_name2), op='-')
+                        enc_result, _, _ = db.calc_variables(self.login, name1, name2, op='-')
                         result = self.private_key.decrypt(enc_result)
+                        print(f"{Fore.GREEN}{name1} - {name2} = {result}{Style.RESET_ALL}")
 
                     if choice == 8:
-                        enc_result, _, _ = db.calc_variables(self.login, pickle.dumps(enc_name1),
-                                                             pickle.dumps(enc_name2), op='*')
+                        enc_result, _, _ = db.calc_variables(self.login, name1, name2, op='*')
                         result = self.private_key.decrypt(enc_result)
+                        print(f"{Fore.GREEN}{name1} * {name2} = {result}{Style.RESET_ALL}")
 
                     if choice == 9:
-                        enc_q, enc_r, enc_value2 = db.calc_variables(self.login, pickle.dumps(enc_name1),
-                                                                     pickle.dumps(enc_name2), op='/')
-                        dec_q = self.private_key.decrypt(enc_q)
-                        dec_r = self.private_key.decrypt(enc_r)
-                        dec_value2 = self.private_key.decrypt(enc_value2)
+                        try:
+                            enc_q, enc_r, enc_value2 = db.calc_variables(self.login, name1, name2, op='/')
+                            dec_q = self.private_key.decrypt(enc_q)
+                            dec_r = self.private_key.decrypt(enc_r)
+                            dec_value2 = self.private_key.decrypt(enc_value2)
 
-                        result = dec_q + dec_r / dec_value2
+                            result = dec_q + dec_r / dec_value2
+                            print(f"{Fore.GREEN}{name1} / {name2} = {result}{Style.RESET_ALL}")
 
-                    print(f"{Fore.GREEN}{name1} + {name2} = {result}{Style.RESET_ALL}")
+                        except ZeroDivisionError:
+                            print(f"{Fore.RED}Division by zero{Style.RESET_ALL}")
+
+                case 10:  # Get private key (root)
+                    print(self.private_key.get_root())
+
+                case 11:  # Get public key (polynomial)
+                    print(self.public_key.get_polynomial())
+
+                case 12:  # Update private and public keys
+                    decision = input(f"{Fore.RED}Updating the keys will lead to erase your remote memory."
+                                     f" Do you want to continue? [y/n] :{Style.RESET_ALL}")
+                    if decision == 'n' or decision == 'no':
+                        continue
+
+                    while True:
+                        try:
+                            base = int(input("Enter number system: "))
+                            degree = int(input("Enter degree of the key polynomial: "))
+                            break
+                        except ValueError:
+                            print(f"{Fore.RED}That was no valid number{Style.RESET_ALL}")
+
+                    self.private_key, self.public_key \
+                        = keygen.generate_abramov_keypair(base, degree)
+
+                    db.update_user_key(self.login, pickle.dumps(self.public_key))
+
+                    with open('keys/private_key.fhe', 'wb') as file_private_key, \
+                            open('keys/public_key.fhe', 'wb') as file_public_key:
+                        file_private_key.write(pickle.dumps(self.private_key))
+                        file_public_key.write(pickle.dumps(self.public_key))
+
+                    print(f"{Fore.GREEN}Private and public keys were updated "
+                          f"and saved to 'keys' directory{Style.RESET_ALL}")
 
                 case _:
                     print(f"{Fore.RED}Undefined option{Style.RESET_ALL}")
