@@ -1,16 +1,12 @@
-import struct
 from typing import Tuple
 import numpy as np
-import bitarray
 
 from abramov_system.keygen import AbramovPublicKey
 
 
-def enter_name(public_key: AbramovPublicKey) -> Tuple[np.poly1d, str]:
+def enter_name(public_key: AbramovPublicKey) -> str:
     name = str(input("Enter a variable name: "))
-    name_as_int = encode(name)
-    enc_name = public_key.encrypt(name_as_int)
-    return enc_name, name
+    return name
 
 
 def enter_value(public_key: AbramovPublicKey) -> Tuple[np.poly1d, int]:
@@ -19,10 +15,11 @@ def enter_value(public_key: AbramovPublicKey) -> Tuple[np.poly1d, int]:
     return enc_value, value
 
 
-def encode(string) -> int:
-    bit_arr = bitarray.bitarray(string)
-    int_value = struct.unpack("<L", bit_arr)[0]
-    return int_value
+# def encode(string) -> int:
+#     bit_arr = bitarray.bitarray()
+#     bit_arr.frombytes(string.encode('utf-8'))
+#     int_value = int(bit_arr.to01(), 2)
+#     return int_value
 
     # bits_arr = []
     # for c in string:
