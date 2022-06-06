@@ -31,7 +31,7 @@ class DBConn:
 
             self.cur.execute(query)
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while inserting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
@@ -48,8 +48,24 @@ class DBConn:
             user_info = self.cur.fetchall()
             return user_info
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
+        finally:
+            self.cur.close()
+            self.conn.commit()
+
+    def update_user_key(self, login: str, public_key: bytes):
+        try:
+            self.cur = self.conn.cursor()
+            query = sql.SQL("UPDATE person SET public_key = {public_key} WHERE login = {login}").format(
+                login=sql.Literal(login),
+                public_key=sql.Literal(public_key)
+            )
+
+            self.cur.execute(query)
+
+        except (ConnectionError, psycopg2.Error) as error:
+            print(f"{Fore.RED}Error while updating data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
             self.conn.commit()
@@ -66,7 +82,7 @@ class DBConn:
             variable_fields = self.cur.fetchall()
             return variable_fields
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
@@ -83,7 +99,7 @@ class DBConn:
             dump = self.cur.fetchall()
             return dump
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
@@ -102,7 +118,7 @@ class DBConn:
 
             return response
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
@@ -119,7 +135,7 @@ class DBConn:
 
             self.cur.execute(query)
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while inserting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
@@ -136,7 +152,7 @@ class DBConn:
 
             self.cur.execute(query)
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while updating data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
@@ -152,13 +168,13 @@ class DBConn:
 
             self.cur.execute(query)
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while deleting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
             self.conn.commit()
 
-    def calc_variables(self, login: str, name1: bytes, name2: bytes, op: str) \
+    def calc_variables(self, login: str, name1: str, name2: str, op: str) \
             -> Tuple[np.poly1d, np.poly1d, np.poly1d]:
         try:
             self.cur = self.conn.cursor()
@@ -166,8 +182,8 @@ class DBConn:
             variable1 = self.get_variable(login, name1)
             variable2 = self.get_variable(login, name2)
 
-            enc_value1 = pickle.loads(variable1[VALUE])
-            enc_value2 = pickle.loads(variable2[VALUE])
+            enc_value1 = pickle.loads(variable1[0][VALUE])
+            enc_value2 = pickle.loads(variable2[0][VALUE])
 
             if op == "+":
                 return enc_value1 + enc_value2, None, None
@@ -176,13 +192,12 @@ class DBConn:
             if op == "*":
                 return enc_value1 * enc_value2, None, None
             if op == "/":
-                if enc_value2 == 0:
-                    raise Exception(f"{Fore.RED}Zero division{Style.RESET_ALL}")
-
+                if enc_value2.order == 0 and enc_value2[0] == 0:
+                    raise ZeroDivisionError()
                 enc_q, enc_r = enc_value1 / enc_value2
                 return enc_q, enc_r, enc_value2
 
-        except (Exception, psycopg2.Error) as error:
+        except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
