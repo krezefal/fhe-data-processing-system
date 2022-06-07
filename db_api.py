@@ -6,6 +6,7 @@ from psycopg2 import sql
 import numpy as np
 
 from consts import VALUE
+from abramov_system import utils
 
 
 class DBConn:
@@ -25,7 +26,7 @@ class DBConn:
             self.cur = self.conn.cursor()
             user_tokens = sql.SQL(', ').join(sql.Literal(n) for n in data)
 
-            query = sql.SQL("INSERT INTO person (login, passwd_hash, public_key) VALUES ({values})").format(
+            query = sql.SQL("INSERT INTO person (login, name, passwd_hash) VALUES ({values})").format(
                 values=user_tokens
             )
 
@@ -186,15 +187,23 @@ class DBConn:
             enc_value2 = pickle.loads(variable2[0][VALUE])
 
             if op == "+":
-                return enc_value1 + enc_value2, None, None
+                res = enc_value1 + enc_value2
+                return res, None, None
             if op == "-":
-                return enc_value1 - enc_value2, None, None
+                res = enc_value1 - enc_value2
+                return res, None, None
             if op == "*":
-                return enc_value1 * enc_value2, None, None
+                res = enc_value1 * enc_value2
+                return res, None, None
             if op == "/":
-                if enc_value2.order == 0 and enc_value2[0] == 0:
+                if utils.is_zero(enc_value2):
                     raise ZeroDivisionError()
+
                 enc_q, enc_r = enc_value1 / enc_value2
+                if utils.is_number(enc_value1) and utils.is_number(enc_value2):
+                    res = enc_q
+                    return res, None, None
+
                 return enc_q, enc_r, enc_value2
 
         except (ConnectionError, psycopg2.Error) as error:
