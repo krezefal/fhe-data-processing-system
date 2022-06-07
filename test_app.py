@@ -1,5 +1,4 @@
-from colorama import Fore, Style
-
+import interface_utils
 from interface import Interface
 
 
@@ -12,12 +11,7 @@ def begin():
         print("'1' -> Sign in")
         print("'2' -> Sign up")
 
-        while True:
-            try:
-                choice = int(input("Enter task number: "))
-                break
-            except ValueError:
-                print(f"{Fore.RED}Number required{Style.RESET_ALL}")
+        choice = interface_utils.enter_option("Enter task number: ")
 
         match choice:
             case 0:
@@ -29,7 +23,7 @@ def begin():
             case 2:
                 _interface.sign_up()
             case _:
-                print(f"{Fore.RED}Invalid action{Style.RESET_ALL}")
+                interface_utils.print_error("Invalid action")
 
 
 if __name__ == "__main__":
