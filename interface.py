@@ -227,4 +227,3 @@ class Interface:
 
                 case _:
                     interface_utils.print_error(f"{Fore.RED}Undefined option{Style.RESET_ALL}")
-
