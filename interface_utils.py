@@ -2,10 +2,10 @@ import pickle
 from getpass import getpass
 from hashlib import md5
 from typing import Tuple
-import numpy as np
 from colorama import Fore, Style
 
-from abramov_system.keygen import AbramovPublicKey
+from homomorphic_polynomial_system.enc_num import EncryptedNumber
+from homomorphic_polynomial_system.keygen import AbramovPublicKey
 from db_api import DBConn
 
 
@@ -70,7 +70,7 @@ def signin_password(correct_password):
 def enter_key(key_type: str):
     while True:
         try:
-            key_path = str(input(f"Specify the path to {key_type} key file or"
+            key_path = str(input(f"Specify the path to {key_type} key file or "
                                  f"press {Fore.CYAN}enter{Style.RESET_ALL} to use default location: "))
             if key_path == "":
                 key_path = f"./keys/{key_type}_key.fhe"
@@ -83,10 +83,14 @@ def enter_key(key_type: str):
             print(f"{Fore.RED}{error}{Style.RESET_ALL}")
 
 
-def enter_value(public_key: AbramovPublicKey) -> Tuple[np.poly1d, int]:
-    value = int(input("Enter a value: "))
-    enc_value = public_key.encrypt(value)
-    return enc_value, value
+def enter_value(public_key: AbramovPublicKey) -> Tuple[EncryptedNumber, int]:
+    while True:
+        try:
+            value = int(input("Enter a value: "))
+            enc_value = public_key.encrypt(value)
+            return enc_value, value
+        except ValueError:
+            print(f"{Fore.RED}It is only possible to enter a number{Style.RESET_ALL}")
 
 
 def print_error(text: str):
