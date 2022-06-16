@@ -3,10 +3,9 @@ from typing import Tuple
 from colorama import Fore, Style
 import psycopg2
 from psycopg2 import sql
-import numpy as np
 
+from homomorphic_polynomial_system.enc_num import EncryptedNumber
 from consts import VALUE
-from abramov_system import utils
 
 
 class DBConn:
@@ -51,22 +50,6 @@ class DBConn:
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
-        finally:
-            self.cur.close()
-            self.conn.commit()
-
-    def update_user_key(self, login: str, public_key: bytes):
-        try:
-            self.cur = self.conn.cursor()
-            query = sql.SQL("UPDATE person SET public_key = {public_key} WHERE login = {login}").format(
-                login=sql.Literal(login),
-                public_key=sql.Literal(public_key)
-            )
-
-            self.cur.execute(query)
-
-        except (ConnectionError, psycopg2.Error) as error:
-            print(f"{Fore.RED}Error while updating data: {error}{Style.RESET_ALL}")
         finally:
             self.cur.close()
             self.conn.commit()
@@ -175,8 +158,7 @@ class DBConn:
             self.cur.close()
             self.conn.commit()
 
-    def calc_variables(self, login: str, name1: str, name2: str, op: str) \
-            -> Tuple[np.poly1d, np.poly1d, np.poly1d]:
+    def calc_variables(self, login: str, name1: str, name2: str, res_name: str, op: str) -> EncryptedNumber:
         try:
             self.cur = self.conn.cursor()
 
@@ -186,25 +168,37 @@ class DBConn:
             enc_value1 = pickle.loads(variable1[0][VALUE])
             enc_value2 = pickle.loads(variable2[0][VALUE])
 
+            enc_result = None
+
             if op == "+":
-                res = enc_value1 + enc_value2
-                return res, None, None
+                enc_result = enc_value1 + enc_value2
             if op == "-":
-                res = enc_value1 - enc_value2
-                return res, None, None
+                enc_result = enc_value1 - enc_value2
             if op == "*":
-                res = enc_value1 * enc_value2
-                return res, None, None
-            if op == "/":
-                if utils.is_zero(enc_value2):
-                    raise ZeroDivisionError()
+                enc_result = enc_value1 * enc_value2
 
-                enc_q, enc_r = enc_value1 / enc_value2
-                if utils.is_number(enc_value1) and utils.is_number(enc_value2):
-                    res = enc_q
-                    return res, None, None
+            self.edit_value(login, res_name, pickle.dumps(enc_result))
+            return enc_result
 
-                return enc_q, enc_r, enc_value2
+        except (ConnectionError, psycopg2.Error) as error:
+            print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
+        finally:
+            self.cur.close()
+            self.conn.commit()
+
+    def div_variables(self, login: str, name1: str, name2: str) -> \
+            Tuple[EncryptedNumber, EncryptedNumber, EncryptedNumber]:
+        try:
+            self.cur = self.conn.cursor()
+
+            variable1 = self.get_variable(login, name1)
+            variable2 = self.get_variable(login, name2)
+
+            enc_value1 = pickle.loads(variable1[0][VALUE])
+            enc_value2 = pickle.loads(variable2[0][VALUE])
+
+            enc_whole_part, enc_remains, enc_divider = enc_value1 / enc_value2
+            return enc_whole_part, enc_remains, enc_divider
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
