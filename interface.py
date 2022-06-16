@@ -1,9 +1,11 @@
 from hashlib import md5
+import numpy as np
 from colorama import Fore, Style
 import pickle
 import yaml
 
-from abramov_system import keygen
+from homomorphic_polynomial_system import keygen
+from homomorphic_polynomial_system.utils import ROUND_TO_INT, ROUND_TO_REAL_NUMBERS
 from db_api import DBConn
 from consts import *
 import interface_utils
@@ -26,13 +28,16 @@ class Interface:
         db.close_connection()
 
     def sign_up(self):
-        print(f"{Fore.CYAN}Signing up: {Fore.WHITE}name{Style.RESET_ALL} -> login -> password")
-        login = interface_utils.signup_login(db)
-
-        print(f"{Fore.CYAN}Signing up: {Style.RESET_ALL} name -> {Fore.WHITE}login{Style.RESET_ALL} -> password")
+        print(f"{Fore.CYAN}Signing up:{Style.RESET_ALL} "
+              f"name{Fore.LIGHTBLACK_EX} -> login -> password{Style.RESET_ALL}")
         name = input("Enter name: ")
 
-        print(f"{Fore.CYAN}Signing up: {Style.RESET_ALL} name -> login -> {Fore.WHITE}password{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Signing up:{Fore.LIGHTBLACK_EX} "
+              f"name -> {Style.RESET_ALL}login{Fore.LIGHTBLACK_EX} -> password{Style.RESET_ALL}")
+        login = interface_utils.signup_login(db)
+
+        print(f"{Fore.CYAN}Signing up:{Fore.LIGHTBLACK_EX} "
+              f"name -> login -> {Style.RESET_ALL}password")
         password = interface_utils.signup_password()
 
         print("To use remote secure memory you need private and public keys.")
@@ -92,7 +97,7 @@ class Interface:
                     name = str(input("Enter a variable name: "))
                     exist = db.check_variable_exist(self.login, name)
                     if exist:
-                        print(f"{Fore.RED}Error: value '{name}' already initialized{Style.RESET_ALL}")
+                        print(f"{Fore.RED}Value '{name}' already initialized{Style.RESET_ALL}")
                         continue
 
                     enc_value, value = interface_utils.enter_value(self.public_key)
@@ -117,13 +122,13 @@ class Interface:
                         value = self.private_key.decrypt(pickle.loads(variable[0][VALUE]))
                         print(f"{Fore.GREEN}{name} = {value}{Style.RESET_ALL}")
                     else:
-                        print(f"{Fore.RED}No variable with name {name}{Style.RESET_ALL}")
+                        print(f"{Fore.RED}No variable with name '{name}'{Style.RESET_ALL}")
 
                 case 4:  # Edit value
                     name = str(input("Enter a variable name: "))
                     exist = db.check_variable_exist(self.login, name)
                     if not exist:
-                        print(f"{Fore.RED}No variable with name {name}{Style.RESET_ALL}")
+                        print(f"{Fore.RED}No variable with name '{name}'{Style.RESET_ALL}")
                         continue
 
                     enc_value, value = interface_utils.enter_value(self.public_key)
@@ -134,7 +139,7 @@ class Interface:
                     name = str(input("Enter a variable name: "))
                     exist = db.check_variable_exist(self.login, name)
                     if not exist:
-                        print(f"{Fore.RED}No variable with name {name}{Style.RESET_ALL}")
+                        print(f"{Fore.RED}No variable with name '{name}'{Style.RESET_ALL}")
                         continue
 
                     db.delete_variable(self.login, name)
@@ -142,53 +147,60 @@ class Interface:
 
                 case 6 | 7 | 8 | 9:  # a +/-/*/'/' b
                     name1 = str(input("Enter 1st variable name: "))
-                    name2 = str(input("Enter 2nd variable name: "))
-                    res_name = str(input("Enter variable name in which to write the result: "))
-
                     exist = db.check_variable_exist(self.login, name1)
-                    if exist is False:
-                        print(f"{Fore.RED}No variable with name {name1}{Style.RESET_ALL}")
+                    if not exist:
+                        print(f"{Fore.RED}No variable with name '{name1}'{Style.RESET_ALL}")
                         continue
+
+                    name2 = str(input("Enter 2nd variable name: "))
                     exist = db.check_variable_exist(self.login, name2)
-                    if exist is False:
-                        print(f"{Fore.RED}No variable with name {name2}{Style.RESET_ALL}")
+                    if not exist:
+                        print(f"{Fore.RED}No variable with name '{name2}'{Style.RESET_ALL}")
                         continue
+
+                    res_name = str(input("Enter variable name in which to write the result: "))
                     exist = db.check_variable_exist(self.login, res_name)
-                    if exist is False:
-                        print(f"{Fore.RED}No variable with name {res_name}{Style.RESET_ALL}")
+                    if not exist:
+                        print(f"{Fore.RED}No variable with name '{res_name}'{Style.RESET_ALL}")
                         continue
 
                     if choice == 6:
-                        enc_result, _, _ = db.calc_variables(self.login, name1, name2, op='+')
-                        db.edit_value(self.login, res_name, pickle.dumps(enc_result))
+                        enc_result = db.calc_variables(self.login, name1, name2, res_name, op="+")
                         result = self.private_key.decrypt(enc_result)
-                        print(f"{Fore.GREEN}{name1} + {name2} = {result}{Style.RESET_ALL}")
+                        rounded_result = np.round(result, ROUND_TO_INT)
+                        print(f"{Fore.GREEN}{name1} + {name2} = {rounded_result}{Style.RESET_ALL}")
 
                     if choice == 7:
-                        enc_result, _, _ = db.calc_variables(self.login, name1, name2, op='-')
-                        db.edit_value(self.login, res_name, pickle.dumps(enc_result))
+                        enc_result = db.calc_variables(self.login, name1, name2, res_name, op="-")
                         result = self.private_key.decrypt(enc_result)
-                        print(f"{Fore.GREEN}{name1} - {name2} = {result}{Style.RESET_ALL}")
+                        rounded_result = np.round(result, ROUND_TO_INT)
+                        print(f"{Fore.GREEN}{name1} - {name2} = {rounded_result}{Style.RESET_ALL}")
 
                     if choice == 8:
-                        enc_result, _, _ = db.calc_variables(self.login, name1, name2, op='*')
-                        db.edit_value(self.login, res_name, pickle.dumps(enc_result))
+                        enc_result = db.calc_variables(self.login, name1, name2, res_name, op="*")
                         result = self.private_key.decrypt(enc_result)
-                        print(f"{Fore.GREEN}{name1} * {name2} = {result}{Style.RESET_ALL}")
+                        rounded_result = np.round(result, ROUND_TO_INT)
+                        print(f"{Fore.GREEN}{name1} * {name2} = {rounded_result}{Style.RESET_ALL}")
 
+                    # DIVISION IS DIFFERENT FROM OTHER OPERATIONS
                     if choice == 9:
                         try:
-                            enc_q, enc_r, enc_value2 = db.calc_variables(self.login, name1, name2, op='/')
-                            if enc_r is None and enc_value2 is None:
-                                result = self.private_key.decrypt(enc_q)
-                            else:
-                                dec_q = self.private_key.decrypt(enc_q)
-                                dec_r = self.private_key.decrypt(enc_r)
-                                dec_value2 = self.private_key.decrypt(enc_value2)
-                                result = dec_q + dec_r / dec_value2
+                            enc_whole_part, enc_remains, enc_divider = db.div_variables(self.login, name1, name2)
 
-                            print(f"{Fore.GREEN}{name1} / {name2} = {result}{Style.RESET_ALL}")
+                            whole_part = self.private_key.decrypt(enc_whole_part)
+                            remains = self.private_key.decrypt(enc_remains)
+                            divider = self.private_key.decrypt(enc_divider)
 
+                            result = whole_part + remains / divider
+                            rounded_result = np.round(result, ROUND_TO_REAL_NUMBERS)
+                            print(f"{Fore.GREEN}{name1} / {name2} = {rounded_result}{Style.RESET_ALL}")
+
+                            rounded_result_to_int = np.round(result, ROUND_TO_INT)
+                            print(f"{Fore.RED}Attention! Cryptosystem doesn't allow to encrypt floats. "
+                                  f"So calculated value will be stored as rounded: "
+                                  f"({rounded_result_to_int}){Style.RESET_ALL}")
+                            enc_rounded_result = self.public_key.encrypt(rounded_result_to_int)
+                            db.edit_value(self.login, res_name, pickle.dumps(enc_rounded_result))
                         except ZeroDivisionError:
                             print(f"{Fore.RED}Division by zero{Style.RESET_ALL}")
 
@@ -204,18 +216,10 @@ class Interface:
                     if decision == 'n' or decision == 'no':
                         continue
 
-                    while True:
-                        try:
-                            base = int(input("Enter number system: "))
-                            degree = int(input("Enter degree of the key polynomial: "))
-                            break
-                        except ValueError:
-                            print(f"{Fore.RED}That was no valid number{Style.RESET_ALL}")
+                    base, degree = interface_utils.enter_alg_params()
 
                     self.private_key, self.public_key \
                         = keygen.generate_abramov_keypair(base, degree)
-
-                    db.update_user_key(self.login, pickle.dumps(self.public_key))
 
                     with open('keys/private_key.fhe', 'wb') as file_private_key, \
                             open('keys/public_key.fhe', 'wb') as file_public_key:
