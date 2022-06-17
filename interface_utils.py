@@ -1,3 +1,6 @@
+import sys
+import getopt
+import yaml
 import pickle
 from getpass import getpass
 from hashlib import md5
@@ -7,6 +10,45 @@ from colorama import Fore, Style
 from homomorphic_polynomial_system.enc_num import EncryptedNumber
 from homomorphic_polynomial_system.keygen import AbramovPublicKey
 from db_api import DBConn
+
+
+def parse_db_creds(argv) -> Tuple[str, str, str, str]:
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+
+    dbname = None
+    user = None
+    host = None
+    password = None
+
+    try:
+        opts, args = getopt.getopt(argv, "hdb:u:ip:pw:", ["dbname=", "user=", "ip=", "password="])
+    except getopt.GetoptError:
+        print("test_app.py -db <dbname> -u <user> -ip <host> -pw <password>")
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print("test_app.py -db <dbname> -u <user> -ip <host> -pw <password>")
+            sys.exit()
+        elif opt in ("-db", "--dbname"):
+            dbname = arg
+        elif opt in ("-u", "--user"):
+            user = arg
+        elif opt in ("-ip", "--ip"):
+            host = arg
+        elif opt in ("-pw", "--password"):
+            password = arg
+
+    if dbname is None:
+        dbname = config['conn_credentials']['dbname']
+    if user is None:
+        user = config['conn_credentials']['user']
+    if host is None:
+        host = config['conn_credentials']['host']
+    if password is None:
+        password = config['conn_credentials']['password']
+
+    return dbname, user, host, password
 
 
 def enter_option(text: str) -> int:
