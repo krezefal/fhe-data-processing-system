@@ -1,5 +1,5 @@
 conn_credentials:
     dbname: secure_remote_memory
     user: postgres
+    host: 127.0.0.1
     password: 1234
-    host: localhost
