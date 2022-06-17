@@ -1,9 +1,12 @@
-import interface_utils
+import sys
+
+from interface_utils import parse_db_creds, enter_option, print_error
 from interface import Interface
 
 
-def begin():
-    _interface = Interface()
+def main(argv):
+    db_creds = parse_db_creds(argv)
+    _interface = Interface(*db_creds)
 
     while True:
 
@@ -11,7 +14,7 @@ def begin():
         print("'1' -> Sign in")
         print("'2' -> Sign up")
 
-        choice = interface_utils.enter_option("Enter task number: ")
+        choice = enter_option("Enter task number: ")
 
         match choice:
             case 0:
@@ -23,8 +26,8 @@ def begin():
             case 2:
                 _interface.sign_up()
             case _:
-                interface_utils.print_error("Invalid action")
+                print_error("Invalid action")
 
 
 if __name__ == "__main__":
-    begin()
+    main(sys.argv[1:])
