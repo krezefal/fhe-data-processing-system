@@ -9,14 +9,18 @@ from consts import VALUE
 
 
 class DBConn:
-    def __init__(self, db_name, user, password):
+    def __init__(self, db_name, user, host, password):
         self.db_name = db_name
         self.user = user
+        self.host = host
         self.password = password
 
         self.cur = None
         try:
-            self.conn = psycopg2.connect(f"dbname={self.db_name} user={self.user} password={self.password}")
+            self.conn = psycopg2.connect(f"dbname={self.db_name} "
+                                         f"user={self.user} "
+                                         f"host={self.host} "
+                                         f"password={self.password}")
         except ConnectionError:
             print(f"{Fore.RED}Error while connection establishment{Style.RESET_ALL}")
 
