@@ -1,0 +1,3 @@
+conn_info:
+    ip: localhost
+    port: 8282
