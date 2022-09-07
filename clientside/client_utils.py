@@ -1,54 +1,54 @@
-import sys
 import getopt
-import yaml
 import pickle
+import sys
 from getpass import getpass
 from hashlib import md5
 from typing import Tuple
+
+import requests
+import yaml
 from colorama import Fore, Style
 
 from homomorphic_polynomial_system.enc_num import EncryptedNumber
 from homomorphic_polynomial_system.keygen import AbramovPublicKey
-from db_api import DBConn
+
+NAME = 0
+RESULT = 0
+WHOLE_PART = 0
+VALUE = 1
+REMAINS = 1
+PASSWORD_HASH = 2
+DIVIDER = 2
+PUBLIC_KEY = 3
 
 
-def parse_db_creds(argv) -> Tuple[str, str, str, str]:
-    with open('config.yaml', 'r') as file:
+def parse_server_info(argv) -> Tuple[str, str]:
+    with open('./clientside/server_info.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
-    dbname = None
-    user = None
-    host = None
-    password = None
+    ip = None
+    port = None
 
     try:
-        opts, args = getopt.getopt(argv, "hdb:u:ip:pw:", ["dbname=", "user=", "ip=", "password="])
+        opts, args = getopt.getopt(argv, "hip:p:", ["ip=", "port="])
     except getopt.GetoptError:
-        print("test_app.py -db <dbname> -u <user> -ip <host> -pw <password>")
+        print("demo_app.py -ip <ip> -p <port>")
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print("test_app.py -db <dbname> -u <user> -ip <host> -pw <password>")
+            print("demo_app.py -ip <ip> -p <port>")
             sys.exit()
-        elif opt in ("-db", "--dbname"):
-            dbname = arg
-        elif opt in ("-u", "--user"):
-            user = arg
         elif opt in ("-ip", "--ip"):
-            host = arg
-        elif opt in ("-pw", "--password"):
-            password = arg
+            ip = arg
+        elif opt in ("-p", "--port"):
+            port = arg
 
-    if dbname is None:
-        dbname = config['conn_credentials']['dbname']
-    if user is None:
-        user = config['conn_credentials']['user']
-    if host is None:
-        host = config['conn_credentials']['host']
-    if password is None:
-        password = config['conn_credentials']['password']
+    if ip is None:
+        ip = config['conn_info']['ip']
+    if port is None:
+        port = config['conn_info']['port']
 
-    return dbname, user, host, password
+    return ip, port
 
 
 def enter_option(text: str) -> int:
@@ -60,11 +60,12 @@ def enter_option(text: str) -> int:
             print(f"{Fore.RED}Number required{Style.RESET_ALL}")
 
 
-def signup_login(db: DBConn) -> str:
+def signup_login(address) -> str:
     while True:
         login = input("Enter login: ")
-        response = db.get_user_info(login)
-        if response:
+        response = requests.get(f"{address}/get_user_info?login={login}",
+                                verify='./clientside/openssl_cert/cert.pem')
+        if len(response.json()) != 0:
             print(f"{Fore.RED}User with this login already exists. Try another{Style.RESET_ALL}")
         else:
             return login
@@ -90,14 +91,15 @@ def enter_alg_params() -> Tuple[int, int]:
             print(f"{Fore.RED}That was no valid number{Style.RESET_ALL}")
 
 
-def response_login(db: DBConn) -> Tuple[str, any]:
+def response_login(address) -> Tuple[str, any]:
     while True:
         login = input("Login: ")
-        response = db.get_user_info(login)
-        if not response:
+        response = requests.get(f"{address}/get_user_info?login={login}",
+                                verify='./clientside/openssl_cert/cert.pem')
+        if len(response.json()) == 0:
             print(f"{Fore.RED}User not found{Style.RESET_ALL}")
         else:
-            return login, response
+            return login, response.json()
 
 
 def signin_password(correct_password):
@@ -115,7 +117,7 @@ def enter_key(key_type: str):
             key_path = str(input(f"Specify the path to {key_type} key file or "
                                  f"press {Fore.CYAN}enter{Style.RESET_ALL} to use default location: "))
             if key_path == "":
-                key_path = f"./keys/{key_type}_key.fhe"
+                key_path = f"./clientside/keys/{key_type}_key.fhe"
 
             with open(key_path, 'rb') as key_file:
                 key = pickle.loads(key_file.read())
