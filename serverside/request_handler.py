@@ -1,11 +1,11 @@
-import pickle
 from typing import Tuple
 from colorama import Fore, Style
 import psycopg2
 from psycopg2 import sql
 
-from homomorphic_polynomial_system.enc_num import EncryptedNumber
-from consts import VALUE
+from homomorphic_polynomial_system.enc_num import serialize, deserialize
+
+VALUE = 1
 
 
 class DBConn:
@@ -24,7 +24,7 @@ class DBConn:
         except ConnectionError:
             print(f"{Fore.RED}Error while connection establishment{Style.RESET_ALL}")
 
-    def create_user(self, data: tuple):
+    def create_user(self, data: list):
         try:
             self.cur = self.conn.cursor()
             user_tokens = sql.SQL(', ').join(sql.Literal(n) for n in data)
@@ -84,8 +84,8 @@ class DBConn:
             )
 
             self.cur.execute(query)
-            dump = self.cur.fetchall()
-            return dump
+            memory_dump = self.cur.fetchall()
+            return memory_dump
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
@@ -112,12 +112,12 @@ class DBConn:
             self.cur.close()
             self.conn.commit()
 
-    def init_new_variable(self, var_data: tuple):
+    def init_new_variable(self, var_data: list):
         try:
             self.cur = self.conn.cursor()
             var_tokens = sql.SQL(', ').join(sql.Literal(n) for n in var_data)
 
-            query = sql.SQL("INSERT INTO memory (var_name, login, value) VALUES ({values})").format(
+            query = sql.SQL("INSERT INTO memory (var_name, value, login) VALUES ({values})").format(
                 values=var_tokens
             )
 
@@ -129,12 +129,12 @@ class DBConn:
             self.cur.close()
             self.conn.commit()
 
-    def edit_value(self, login: str, name: str, value: bytes):
+    def edit_value(self, login: str, var_name: str, value: str):
         try:
             self.cur = self.conn.cursor()
-            query = sql.SQL("UPDATE memory SET value = {value} WHERE login = {login} and var_name = {name}").format(
+            query = sql.SQL("UPDATE memory SET value = {value} WHERE login = {login} and var_name = {var_name}").format(
                 login=sql.Literal(login),
-                name=sql.Literal(name),
+                var_name=sql.Literal(var_name),
                 value=sql.Literal(value)
             )
 
@@ -146,12 +146,12 @@ class DBConn:
             self.cur.close()
             self.conn.commit()
 
-    def delete_variable(self, login: str, name: str):
+    def delete_variable(self, login: str, var_name: str):
         try:
             self.cur = self.conn.cursor()
-            query = sql.SQL("DELETE FROM memory WHERE login = {login} and var_name = {name}").format(
+            query = sql.SQL("DELETE FROM memory WHERE login = {login} and var_name = {var_name}").format(
                 login=sql.Literal(login),
-                name=sql.Literal(name),
+                var_name=sql.Literal(var_name),
             )
 
             self.cur.execute(query)
@@ -162,15 +162,15 @@ class DBConn:
             self.cur.close()
             self.conn.commit()
 
-    def calc_variables(self, login: str, name1: str, name2: str, res_name: str, op: str) -> EncryptedNumber:
+    def calc_variables(self, login: str, var_name1: str, var_name2: str, var_name_res: str, op: str) -> str:
         try:
             self.cur = self.conn.cursor()
 
-            variable1 = self.get_variable(login, name1)
-            variable2 = self.get_variable(login, name2)
+            variable1 = self.get_variable(login, var_name1)
+            variable2 = self.get_variable(login, var_name2)
 
-            enc_value1 = pickle.loads(variable1[0][VALUE])
-            enc_value2 = pickle.loads(variable2[0][VALUE])
+            enc_value1 = deserialize(variable1[0][VALUE])
+            enc_value2 = deserialize(variable2[0][VALUE])
 
             enc_result = None
 
@@ -181,8 +181,8 @@ class DBConn:
             if op == "*":
                 enc_result = enc_value1 * enc_value2
 
-            self.edit_value(login, res_name, pickle.dumps(enc_result))
-            return enc_result
+            self.edit_value(login, var_name_res, serialize(enc_result))
+            return serialize(enc_result)
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
@@ -190,19 +190,19 @@ class DBConn:
             self.cur.close()
             self.conn.commit()
 
-    def div_variables(self, login: str, name1: str, name2: str) -> \
-            Tuple[EncryptedNumber, EncryptedNumber, EncryptedNumber]:
+    def div_variables(self, login: str, var_name1: str, var_name2: str) -> \
+            Tuple[str, str, str]:
         try:
             self.cur = self.conn.cursor()
 
-            variable1 = self.get_variable(login, name1)
-            variable2 = self.get_variable(login, name2)
+            variable1 = self.get_variable(login, var_name1)
+            variable2 = self.get_variable(login, var_name2)
 
-            enc_value1 = pickle.loads(variable1[0][VALUE])
-            enc_value2 = pickle.loads(variable2[0][VALUE])
+            enc_value1 = deserialize(variable1[0][VALUE])
+            enc_value2 = deserialize(variable2[0][VALUE])
 
             enc_whole_part, enc_remains, enc_divider = enc_value1 / enc_value2
-            return enc_whole_part, enc_remains, enc_divider
+            return serialize(enc_whole_part), serialize(enc_remains), serialize(enc_divider)
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
