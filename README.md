@@ -14,5 +14,12 @@ Secure data processing system using homomorphic encryption
 1. `sudo docker pull krezefal/secure-remote-memory`
 2. `sudo docker run -d --name secure-remote-memory-container -p 5432:5432 krezefal/secure-remote-memory`
 
+## Generating self-signed OpenSSL certificates
+
+`openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
+`
+
+It is important to specify the IP address of the server as **Common Name** while generating certs.
+
 ## Run the app
-`python3 test_app.py`
+`python3 demo_app.py`
