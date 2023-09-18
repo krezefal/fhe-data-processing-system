@@ -68,7 +68,15 @@ class DBConn:
 
             self.cur.execute(query)
             variable_fields = self.cur.fetchall()
-            return variable_fields
+
+            if variable_fields:
+                jsonify_variable_fields = []
+                jsonify_variable_fields.append(variable_fields[0][0])
+                jsonify_variable_fields.append(str(variable_fields[0][1],'utf8'))
+                jsonify_variable_fields.append(variable_fields[0][2])
+                return [jsonify_variable_fields]
+            else:
+                return variable_fields
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
@@ -85,7 +93,17 @@ class DBConn:
 
             self.cur.execute(query)
             memory_dump = self.cur.fetchall()
-            return memory_dump
+
+            jsonify_memory_dump = []
+            for raw in memory_dump:
+                new_raw = []
+                new_raw.append(raw[0])
+                new_raw.append(str(raw[1],'utf8'))
+                new_raw.append(raw[2])
+
+                jsonify_memory_dump.append(new_raw)
+
+            return jsonify_memory_dump
 
         except (ConnectionError, psycopg2.Error) as error:
             print(f"{Fore.RED}Error while getting data: {error}{Style.RESET_ALL}")
