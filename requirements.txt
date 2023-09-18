@@ -1,8 +1,8 @@
-PyYAML==6.0
+PyYAML==6.0.1
 numpy==1.22.4
 bitarray==2.5.1
-colorama==0.4.4
-Flask==2.0.1
-requests==2.27.0
-urllib3==1.26.6
+colorama==0.4.6
+Flask==2.0.3
+requests==2.27.1
+urllib3==1.26.16
 psycopg2-binary==2.9.7
