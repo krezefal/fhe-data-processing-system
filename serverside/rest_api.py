@@ -1,8 +1,8 @@
 import sys
 from flask import Flask, jsonify, request, Response
 
-from serverside.request_handler import DBConn
-from serverside.server_utils import parse_db_creds
+from request_handler import DBConn
+from server_utils import parse_db_creds
 
 app = Flask(__name__)
 PORT = 8282
